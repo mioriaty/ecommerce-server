@@ -1,25 +1,29 @@
 import { HttpException, Injectable, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
-import { LoginBodyType, LogoutBodyType, RefreshTokenBodyType, SendOTPBodyType } from 'src/routes/auth/auth.model.js';
+import { addMilliseconds } from 'date-fns';
+import ms, { StringValue } from 'ms';
+import {
+  GoogleAuthStateType,
+  LoginBodyType,
+  LogoutBodyType,
+  RefreshTokenBodyType,
+  SendOTPBodyType
+} from 'src/routes/auth/auth.model.js';
 import { AuthRepository } from 'src/routes/auth/auth.repository.js';
 import { RegisterBodyDTO } from 'src/routes/auth/dto/register.dto.js';
 import { RoleService } from 'src/routes/auth/role.service.js';
-import { generateOTP, isNotFoundPrismaError, isUniqueConstraintPrismaError } from 'src/shared/helpers.js';
-import { SharedUserRepository } from 'src/shared/repositories/shared-user.repository.js';
-import { HashingService } from 'src/shared/services/hashing.service.js';
-import { PrismaService } from 'src/shared/services/prisma.service.js';
-import { TokenService } from 'src/shared/services/token.service.js';
-import { AccessTokenPayloadCreate } from 'src/shared/types/jwt.type.js';
-import { addMilliseconds } from 'date-fns';
-import ms, { StringValue } from 'ms';
 import envConfig from 'src/shared/config.js';
 import { TypeOfVerificationCode } from 'src/shared/constants/auth.constant.js';
+import { generateOTP, isNotFoundPrismaError, isUniqueConstraintPrismaError } from 'src/shared/helpers.js';
+import { SharedUserRepository } from 'src/shared/repositories/shared-user.repository.js';
 import { EmailService } from 'src/shared/services/email.service.js';
+import { HashingService } from 'src/shared/services/hashing.service.js';
+import { TokenService } from 'src/shared/services/token.service.js';
+import { AccessTokenPayloadCreate } from 'src/shared/types/jwt.type.js';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly hashingService: HashingService,
-    private readonly prismaService: PrismaService,
     private readonly tokenService: TokenService,
     private readonly roleService: RoleService,
     private readonly authRepository: AuthRepository,
@@ -77,7 +81,7 @@ export class AuthService {
     }
   }
 
-  async login(body: LoginBodyType & { userAgent: string; ip: string }) {
+  async login(body: LoginBodyType & GoogleAuthStateType) {
     const user = await this.authRepository.findUserIncludeRole({
       email: body.email
     });
@@ -118,7 +122,7 @@ export class AuthService {
     return tokens;
   }
 
-  async refreshToken({ refreshToken, ip, userAgent }: RefreshTokenBodyType & { userAgent: string; ip: string }) {
+  async refreshToken({ refreshToken, ip, userAgent }: RefreshTokenBodyType & GoogleAuthStateType) {
     try {
       // 1. Kiểm tra refreshToken có hợp lệ không
       const { userId } = await this.tokenService.verifyRefreshToken(refreshToken);
@@ -164,13 +168,20 @@ export class AuthService {
     try {
       // 1. Kiểm tra refreshToken có hợp lệ không
       await this.tokenService.verifyRefreshToken(refreshToken);
+
       // 2. Xóa refreshToken trong database
-      await this.prismaService.refreshToken.delete({
-        where: {
-          token: refreshToken
-        }
+      const deletedRT = await this.authRepository.deleteRefreshToken({
+        token: refreshToken
       });
-      return { message: 'Logout successfully' };
+
+      // 3. Cập nhật device đã logout
+      await this.authRepository.updateDevice(deletedRT.deviceId, {
+        isActive: false
+      });
+
+      return {
+        message: 'Logout successfully'
+      };
     } catch (error) {
       // Trường hợp đã refresh token rồi, hãy thông báo cho user biết
       // refresh token của họ đã bị đánh cắp
@@ -213,7 +224,7 @@ export class AuthService {
     // create otp
     const otp = generateOTP();
 
-    const verificationCode = await this.authRepository.createVerificationCode({
+    await this.authRepository.createVerificationCode({
       code: otp,
       email: body.email,
       type: body.type,
@@ -222,6 +233,7 @@ export class AuthService {
 
     // send otp
     const { error } = await this.emailService.sendOTP({ email: body.email, code: otp });
+
     if (error) {
       throw new UnprocessableEntityException([
         {
@@ -230,6 +242,8 @@ export class AuthService {
         }
       ]);
     }
-    return verificationCode;
+    return {
+      message: `OTP sent successfully to ${body.email}`
+    };
   }
 }

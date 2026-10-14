@@ -3973,8 +3973,8 @@ packages:
     resolution: {integrity: sha512-RwMTC61u7hrG3ZJMkZQOK4JLJrKS8QtoTii63EmWvFXHqycY9FObBJQCbsLxSO8kjKhWE5kV1GC+Vb1g3RI0Zg==}
     engines: {node: '>=18'}
 
-  google-auth-library@11.1.0:
-    resolution: {integrity: sha512-YIBq5KNoHQrZ9PM4PeodDBqqBGlSTIxh1zibN8u3zNIO9UJg8gvKuCpdKV7fWXhsZ2zRkU6FhGrgKNgLJ2IRgw==}
+  google-auth-library@11.3.0:
+    resolution: {integrity: sha512-gZCyszARHj47WNcKrAcQtimDwtTZpydRZ3HSeb66hObfQU9uaG50ejsZ8LzGISIVAjpsZEouGVs65Q/XRau0Qg==}
     engines: {node: '>=22'}
 
   google-logging-utils@2.0.1:
@@ -9882,7 +9882,7 @@ snapshots:
 
   globals@17.13.0: {}
 
-  google-auth-library@11.1.0(supports-color@8.1.1):
+  google-auth-library@11.3.0(supports-color@8.1.1):
     dependencies:
       base64-js: 1.5.1
       ecdsa-sig-formatter: 1.0.11
@@ -9899,7 +9899,7 @@ snapshots:
     dependencies:
       extend: 3.0.2
       gaxios: 7.3.1(supports-color@8.1.1)
-      google-auth-library: 11.1.0(supports-color@8.1.1)
+      google-auth-library: 11.3.0(supports-color@8.1.1)
       google-logging-utils: 2.0.1
       qs: 6.16.0
       url-template: 2.0.8
@@ -9908,7 +9908,7 @@ snapshots:
 
   googleapis@178.1.1(supports-color@8.1.1):
     dependencies:
-      google-auth-library: 11.1.0(supports-color@8.1.1)
+      google-auth-library: 11.3.0(supports-color@8.1.1)
       googleapis-common: 9.1.0(supports-color@8.1.1)
     transitivePeerDependencies:
       - supports-color
