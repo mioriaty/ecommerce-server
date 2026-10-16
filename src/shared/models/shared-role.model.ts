@@ -1,8 +1,8 @@
-import { PermissionSchema } from './shared-permission.model.js';
-import { DateTimeSchema } from './date-time.model.js';
+import { permissionSchema } from './shared-permission.model.js';
+import { dateTimeSchema } from './date-time.model.js';
 import { z } from 'zod';
 
-export const RoleSchema = z.object({
+export const roleSchema = z.object({
   id: z.number(),
   name: z.string().max(500),
   description: z.string(),
@@ -10,13 +10,13 @@ export const RoleSchema = z.object({
   createdById: z.number().nullable(),
   updatedById: z.number().nullable(),
   deletedById: z.number().nullable(),
-  deletedAt: DateTimeSchema.nullable(),
-  createdAt: DateTimeSchema,
-  updatedAt: DateTimeSchema
+  deletedAt: dateTimeSchema.nullable(),
+  createdAt: dateTimeSchema,
+  updatedAt: dateTimeSchema
 });
 
-export const RolePermissionsSchema = RoleSchema.extend({
-  permissions: z.array(PermissionSchema)
+export const RolePermissionsSchema = roleSchema.extend({
+  permissions: z.array(permissionSchema)
 });
-export type RoleType = z.infer<typeof RoleSchema>;
+export type RoleType = z.infer<typeof roleSchema>;
 export type RolePermissionsType = z.infer<typeof RolePermissionsSchema>;

@@ -1,7 +1,7 @@
 import { UserStatus } from 'src/shared/constants/auth.constant.js';
 import z from 'zod';
 
-export const UserSchema = z.object({
+export const userSchema = z.object({
   id: z.number(),
   email: z.email(),
   name: z.string().min(1).max(100),
@@ -18,4 +18,4 @@ export const UserSchema = z.object({
   updatedAt: z.date()
 });
 
-export type UserType = z.infer<typeof UserSchema>;
+export type UserType = z.infer<typeof userSchema>;

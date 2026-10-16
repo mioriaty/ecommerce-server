@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Query, Res } from '@nestjs/common';
 import { ZodSerializerDto } from 'nestjs-zod';
 import { GetAuthorizationUrlResDTO } from 'src/routes/auth/dto/google.dto.js';
-import { LoginBodyDTO } from 'src/routes/auth/dto/login.dto.js';
+import { ForgotPasswordBodyDTO, LoginBodyDTO } from 'src/routes/auth/dto/login.dto.js';
 import { LogoutBodyDTO } from 'src/routes/auth/dto/logout.dto.js';
 import { RefreshTokenBodyDTO, RefreshTokenResponseDTO } from 'src/routes/auth/dto/refresh-token.dto.js';
 import { RegisterBodyDTO, RegisterResponseDTO, SendOTPBodyDTO } from 'src/routes/auth/dto/register.dto.js';
@@ -23,15 +23,15 @@ export class AuthController {
   @Post('register')
   @IsPublic()
   @ZodSerializerDto(RegisterResponseDTO)
-  async register(@Body() body: RegisterBodyDTO) {
-    return await this.authService.register(body);
+  async register(@Body() dto: RegisterBodyDTO) {
+    return await this.authService.register(dto);
   }
 
   @Post('login')
   @IsPublic()
-  async login(@Body() body: LoginBodyDTO, @UserAgent() userAgent: string, @Ip() ip: string) {
+  async login(@Body() dto: LoginBodyDTO, @UserAgent() userAgent: string, @Ip() ip: string) {
     return await this.authService.login({
-      ...body,
+      ...dto,
       userAgent,
       ip
     });
@@ -41,9 +41,9 @@ export class AuthController {
   @IsPublic()
   @HttpCode(HttpStatus.OK)
   @ZodSerializerDto(RefreshTokenResponseDTO)
-  async refreshToken(@Body() body: RefreshTokenBodyDTO, @UserAgent() userAgent: string, @Ip() ip: string) {
+  async refreshToken(@Body() dto: RefreshTokenBodyDTO, @UserAgent() userAgent: string, @Ip() ip: string) {
     return await this.authService.refreshToken({
-      refreshToken: body.refreshToken,
+      refreshToken: dto.refreshToken,
       userAgent,
       ip
     });
@@ -51,15 +51,15 @@ export class AuthController {
 
   @Post('logout')
   @ZodSerializerDto(MessageResDTO)
-  async logout(@Body() body: LogoutBodyDTO) {
-    return await this.authService.logout(body);
+  async logout(@Body() dto: LogoutBodyDTO) {
+    return await this.authService.logout(dto);
   }
 
   @Post('otp')
   @IsPublic()
   @ZodSerializerDto(MessageResDTO)
-  async sendOTP(@Body() body: SendOTPBodyDTO) {
-    return await this.authService.sendOTP(body);
+  async sendOTP(@Body() dto: SendOTPBodyDTO) {
+    return await this.authService.sendOTP(dto);
   }
 
   @Get('google-link')
@@ -81,5 +81,12 @@ export class AuthController {
       const message = error instanceof Error ? error.message : 'Login with google failed, please try again.';
       return res.redirect(`${envConfig.GOOGLE_CLIENT_REDIRECT_URI}?errorMessage=${message}`);
     }
+  }
+
+  @Post('forgot-password')
+  @IsPublic()
+  @ZodSerializerDto(MessageResDTO)
+  async forgotPassword(@Body() dto: ForgotPasswordBodyDTO) {
+    return await this.authService.forgotPassword(dto);
   }
 }

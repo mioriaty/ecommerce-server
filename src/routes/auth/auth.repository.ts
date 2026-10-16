@@ -36,7 +36,9 @@ export class AuthRepository {
     return user;
   }
 
-  async createVerificationCode(payload: Pick<VerificationCodeType, 'code' | 'email' | 'type' | 'expiresAt'>) {
+  async createVerificationCode(
+    payload: Pick<VerificationCodeType, 'code' | 'email' | 'type' | 'expiresAt'>
+  ): Promise<VerificationCodeType> {
     return await this.prismaService.verificationCode.upsert({
       where: {
         email_type: {
@@ -117,6 +119,28 @@ export class AuthRepository {
   async deleteRefreshToken(uniqueObject: { token: string }): Promise<RefreshTokenType> {
     return await this.prismaService.refreshToken.delete({
       where: uniqueObject
+    });
+  }
+
+  async updateUser(where: { id: number } | { email: string }, data: Partial<Omit<UserType, 'id'>>): Promise<UserType> {
+    return this.prismaService.user.update({
+      where,
+      data
+    });
+  }
+
+  async deleteVerificationCode(
+    where:
+      | {
+          email_type: {
+            email: string;
+            type: TypeOfVerificationCodeType;
+          };
+        }
+      | { id: number }
+  ): Promise<VerificationCodeType> {
+    return await this.prismaService.verificationCode.delete({
+      where
     });
   }
 }

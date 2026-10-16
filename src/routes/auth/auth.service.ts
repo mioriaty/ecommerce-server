@@ -2,6 +2,7 @@ import { HttpException, Injectable, UnauthorizedException, UnprocessableEntityEx
 import { addMilliseconds } from 'date-fns';
 import ms, { StringValue } from 'ms';
 import {
+  ForgotPasswordBodyType,
   GoogleAuthStateType,
   LoginBodyType,
   LogoutBodyType,
@@ -10,9 +11,19 @@ import {
 } from 'src/routes/auth/auth.model.js';
 import { AuthRepository } from 'src/routes/auth/auth.repository.js';
 import { RegisterBodyDTO } from 'src/routes/auth/dto/register.dto.js';
+import {
+  OTPExpiredException,
+  InvalidOTPException,
+  EmailAlreadyExistException,
+  EmailNotFoundException,
+  FailedToSendOTPException,
+  RefreshTokenAlreadyUsedException,
+  UnauthorizedAccessException,
+  PasswordIncorrectException
+} from 'src/routes/auth/auth.error.js';
 import { RoleService } from 'src/routes/auth/role.service.js';
 import envConfig from 'src/shared/config.js';
-import { TypeOfVerificationCode } from 'src/shared/constants/auth.constant.js';
+import { TypeOfVerificationCode, TypeOfVerificationCodeType } from 'src/shared/constants/auth.constant.js';
 import { generateOTP, isNotFoundPrismaError, isUniqueConstraintPrismaError } from 'src/shared/helpers.js';
 import { SharedUserRepository } from 'src/shared/repositories/shared-user.repository.js';
 import { EmailService } from 'src/shared/services/email.service.js';
@@ -31,51 +42,62 @@ export class AuthService {
     private readonly emailService: EmailService
   ) {}
 
+  private async validateVerificationCode({
+    email,
+    type,
+    code
+  }: {
+    email: string;
+    type: TypeOfVerificationCodeType;
+    code: string;
+  }) {
+    const verificationCode = await this.authRepository.findVerificationCode({
+      email_type: {
+        email,
+        type
+      }
+    });
+
+    if (!verificationCode || verificationCode.code !== code) {
+      throw InvalidOTPException;
+    }
+
+    if (verificationCode.expiresAt < new Date()) {
+      throw OTPExpiredException;
+    }
+
+    return verificationCode;
+  }
+
   async register(body: RegisterBodyDTO) {
     try {
-      const verificationCode = await this.authRepository.findVerificationCode({
-        email_type: {
-          email: body.email,
-          type: TypeOfVerificationCode.REGISTER
-        }
+      await this.validateVerificationCode({
+        email: body.email,
+        type: TypeOfVerificationCode.REGISTER,
+        code: body.code
       });
-
-      if (!verificationCode) {
-        throw new UnprocessableEntityException([
-          {
-            path: 'code',
-            message: 'Code is invalid'
-          }
-        ]);
-      }
-
-      if (verificationCode.expiresAt < new Date()) {
-        throw new UnprocessableEntityException([
-          {
-            path: 'code',
-            message: 'Code is expired'
-          }
-        ]);
-      }
 
       const clientRoleId = await this.roleService.getRoleClientId();
       const hashedPassword = await this.hashingService.hash(body.password);
 
-      return await this.authRepository.createUser({
-        email: body.email,
-        name: body.name,
-        phoneNumber: body.phoneNumber,
-        password: hashedPassword,
-        roleId: clientRoleId
-      });
+      const [user] = await Promise.all([
+        this.authRepository.createUser({
+          email: body.email,
+          name: body.name,
+          phoneNumber: body.phoneNumber,
+          password: hashedPassword,
+          roleId: clientRoleId
+        }),
+
+        this.authRepository.deleteVerificationCode({
+          email_type: { email: body.email, type: TypeOfVerificationCode.REGISTER }
+        })
+      ]);
+
+      return user;
     } catch (error) {
       if (isUniqueConstraintPrismaError(error)) {
-        throw new UnprocessableEntityException([
-          {
-            path: 'email',
-            message: 'Email is already taken'
-          }
-        ]);
+        throw EmailAlreadyExistException;
       }
       throw error;
     }
@@ -87,23 +109,13 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnprocessableEntityException([
-        {
-          path: 'email',
-          message: 'Account not found'
-        }
-      ]);
+      throw EmailNotFoundException;
     }
 
     const isPasswordMatch = await this.hashingService.compare(body.password, user.password);
 
     if (!isPasswordMatch) {
-      throw new UnprocessableEntityException([
-        {
-          path: 'password',
-          message: 'Password is incorrect'
-        }
-      ]);
+      throw PasswordIncorrectException;
     }
 
     const device = await this.authRepository.createDevice({
@@ -131,12 +143,15 @@ export class AuthService {
       const refreshTokenInDB = await this.authRepository.findUniqueRefreshToken({ token: refreshToken });
 
       if (!refreshTokenInDB) {
-        throw new UnauthorizedException('Refresh token is already used or invalid');
+        throw RefreshTokenAlreadyUsedException;
       }
 
       const {
         deviceId,
-        user: { roleId, name: roleName }
+        user: {
+          roleId,
+          role: { name: roleName }
+        }
       } = refreshTokenInDB;
 
       // 3. Cập nhật device
@@ -160,7 +175,7 @@ export class AuthService {
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new UnauthorizedException();
+      throw UnauthorizedAccessException;
     }
   }
 
@@ -186,9 +201,9 @@ export class AuthService {
       // Trường hợp đã refresh token rồi, hãy thông báo cho user biết
       // refresh token của họ đã bị đánh cắp
       if (isNotFoundPrismaError(error)) {
-        throw new UnauthorizedException('Refresh token has been revoked');
+        throw RefreshTokenAlreadyUsedException;
       }
-      throw new UnauthorizedException();
+      throw UnauthorizedAccessException;
     }
   }
 
@@ -212,13 +227,12 @@ export class AuthService {
     // check email exist in database
     const user = await this.sharedUserRepository.findUnique({ email: body.email });
 
-    if (user) {
-      throw new UnprocessableEntityException([
-        {
-          path: 'email',
-          message: 'Email is already taken'
-        }
-      ]);
+    if (user && body.type === TypeOfVerificationCode.REGISTER) {
+      throw EmailAlreadyExistException;
+    }
+
+    if (!user && body.type === TypeOfVerificationCode.FORGOT_PASSWORD) {
+      throw EmailNotFoundException;
     }
 
     // create otp
@@ -235,15 +249,42 @@ export class AuthService {
     const { error } = await this.emailService.sendOTP({ email: body.email, code: otp });
 
     if (error) {
-      throw new UnprocessableEntityException([
-        {
-          path: 'code',
-          message: 'Failed to send OTP'
-        }
-      ]);
+      throw FailedToSendOTPException;
     }
     return {
       message: `OTP sent successfully to ${body.email}`
+    };
+  }
+
+  async forgotPassword(body: ForgotPasswordBodyType) {
+    const { email, newPassword } = body;
+
+    // 1. Kiểm tra email đã tồn tại trong DB hay chưa
+    const user = await this.sharedUserRepository.findUnique({ email });
+
+    if (!user) {
+      throw EmailNotFoundException;
+    }
+
+    // 2. Kiểm tra mã OTP có hợp lệ không
+    await this.validateVerificationCode({
+      email: user.email,
+      type: TypeOfVerificationCode.FORGOT_PASSWORD,
+      code: body.code
+    });
+
+    // 3. Cập nhật lại password mới và xóa OTP
+    const hashedPassword = await this.hashingService.hash(newPassword);
+
+    await Promise.all([
+      this.authRepository.updateUser({ id: user.id }, { password: hashedPassword }),
+      this.authRepository.deleteVerificationCode({
+        email_type: { email, type: TypeOfVerificationCode.FORGOT_PASSWORD }
+      })
+    ]);
+
+    return {
+      message: 'Password reset successfully'
     };
   }
 }

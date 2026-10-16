@@ -1,5 +1,10 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Auth, google } from 'googleapis';
+import {
+  AccountBlockedException,
+  GoogleUserInfoError,
+  UnauthorizedAccessException
+} from 'src/routes/auth/auth.error.js';
 import { GoogleAuthStateType } from 'src/routes/auth/auth.model.js';
 import { AuthRepository } from 'src/routes/auth/auth.repository.js';
 import { AuthService } from 'src/routes/auth/auth.service.js';
@@ -78,7 +83,7 @@ export class GoogleService {
       const { data } = await oauth2.userinfo.get();
 
       if (!data.email) {
-        throw new Error('Không lấy được email');
+        throw GoogleUserInfoError;
       }
 
       // 4. Tìm user
@@ -101,7 +106,7 @@ export class GoogleService {
       }
 
       if (user.status === UserStatus.BLOCKED) {
-        throw new ForbiddenException('Error.AccountBlocked');
+        throw AccountBlockedException;
       }
 
       // 6. Tạo device
@@ -121,7 +126,7 @@ export class GoogleService {
 
       return authTokens;
     } catch (error) {
-      throw new Error('Login Google failed');
+      throw UnauthorizedAccessException;
     }
   }
 }

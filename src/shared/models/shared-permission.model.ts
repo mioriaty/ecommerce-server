@@ -1,8 +1,8 @@
 import { HTTPMethod } from '../constants/role.constant.js';
 import { z } from 'zod';
-import { DateTimeSchema } from './date-time.model.js';
+import { dateTimeSchema } from './date-time.model.js';
 
-export const PermissionSchema = z.object({
+export const permissionSchema = z.object({
   id: z.number(),
   name: z.string().max(500),
   description: z.string(),
@@ -20,8 +20,8 @@ export const PermissionSchema = z.object({
   createdById: z.number().nullable(),
   updatedById: z.number().nullable(),
   deletedById: z.number().nullable(),
-  deletedAt: DateTimeSchema.nullable(),
-  createdAt: DateTimeSchema,
-  updatedAt: DateTimeSchema
+  deletedAt: dateTimeSchema.nullable(),
+  createdAt: dateTimeSchema,
+  updatedAt: dateTimeSchema
 });
-export type PermissionType = z.infer<typeof PermissionSchema>;
+export type PermissionType = z.infer<typeof permissionSchema>;
