@@ -7,9 +7,10 @@ import { SharedModule } from 'src/shared/shared.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './routes/auth/auth.module.js';
+import { LanguageModule } from './routes/language/language.module.js';
 
 @Module({
-  imports: [SharedModule, AuthModule],
+  imports: [SharedModule, AuthModule, LanguageModule],
   controllers: [AppController],
   providers: [
     AppService,
