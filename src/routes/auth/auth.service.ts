@@ -1,7 +1,21 @@
-import { HttpException, Injectable, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { addMilliseconds } from 'date-fns';
 import ms, { StringValue } from 'ms';
 import {
+  EmailAlreadyExistException,
+  EmailNotFoundException,
+  FailedToSendOTPException,
+  InvalidOTPException,
+  InvalidTOTPAndCodeException,
+  OTPExpiredException,
+  PasswordIncorrectException,
+  RefreshTokenAlreadyUsedException,
+  TOTPAlreadyEnabledException,
+  TOTPNotEnabledException,
+  UnauthorizedAccessException
+} from 'src/routes/auth/auth.error.js';
+import {
+  Disable2FABodyType,
   ForgotPasswordBodyType,
   GoogleAuthStateType,
   LoginBodyType,
@@ -11,21 +25,12 @@ import {
 } from 'src/routes/auth/auth.model.js';
 import { AuthRepository } from 'src/routes/auth/auth.repository.js';
 import { RegisterBodyDTO } from 'src/routes/auth/dto/register.dto.js';
-import {
-  OTPExpiredException,
-  InvalidOTPException,
-  EmailAlreadyExistException,
-  EmailNotFoundException,
-  FailedToSendOTPException,
-  RefreshTokenAlreadyUsedException,
-  UnauthorizedAccessException,
-  PasswordIncorrectException
-} from 'src/routes/auth/auth.error.js';
 import { RoleService } from 'src/routes/auth/role.service.js';
 import envConfig from 'src/shared/config.js';
 import { TypeOfVerificationCode, TypeOfVerificationCodeType } from 'src/shared/constants/auth.constant.js';
 import { generateOTP, isNotFoundPrismaError, isUniqueConstraintPrismaError } from 'src/shared/helpers.js';
 import { SharedUserRepository } from 'src/shared/repositories/shared-user.repository.js';
+import { TwoFactorService } from 'src/shared/services/2fa.service.js';
 import { EmailService } from 'src/shared/services/email.service.js';
 import { HashingService } from 'src/shared/services/hashing.service.js';
 import { TokenService } from 'src/shared/services/token.service.js';
@@ -39,7 +44,8 @@ export class AuthService {
     private readonly roleService: RoleService,
     private readonly authRepository: AuthRepository,
     private readonly sharedUserRepository: SharedUserRepository,
-    private readonly emailService: EmailService
+    private readonly emailService: EmailService,
+    private readonly twoFactorService: TwoFactorService
   ) {}
 
   private async validateVerificationCode({
@@ -104,6 +110,8 @@ export class AuthService {
   }
 
   async login(body: LoginBodyType & GoogleAuthStateType) {
+    // 1. Lấy thông tin user, kiểm tra user có tồn tại hay không, password có đúng không
+
     const user = await this.authRepository.findUserIncludeRole({
       email: body.email
     });
@@ -118,12 +126,47 @@ export class AuthService {
       throw PasswordIncorrectException;
     }
 
+    // 2. Nếu user đã bật 2FA, kiểm tra 2FA TOTP code hoặc OTP code
+    if (user.totpSecret) {
+      // Nếu không có TOTP code và code thì thông báo cho client biết
+      if (!body.code && !body.totpCode) {
+        throw InvalidTOTPAndCodeException;
+      }
+
+      // Kiểm tra TOTP code có hợp lệ
+      if (body.totpCode) {
+        const isValidTOTPCode = this.twoFactorService.verifyTOTP({
+          email: user.email,
+          secret: user.totpSecret,
+          token: body.totpCode
+        });
+
+        if (!isValidTOTPCode) {
+          throw InvalidOTPException;
+        }
+      } else if (body.code) {
+        await this.validateVerificationCode({
+          email: user.email,
+          type: TypeOfVerificationCode.LOGIN,
+          code: body.code
+        });
+        await this.authRepository.deleteVerificationCode({
+          email_type: {
+            email: user.email,
+            type: TypeOfVerificationCode.LOGIN
+          }
+        });
+      }
+    }
+
+    // 3. Tạo mới device
     const device = await this.authRepository.createDevice({
       userId: user.id,
       ip: body.ip,
       userAgent: body.userAgent
     });
 
+    // 4. Tạo tokens trả về client
     const tokens = await this.generateTokens({
       userId: user.id,
       deviceId: device.id,
@@ -285,6 +328,79 @@ export class AuthService {
 
     return {
       message: 'Password reset successfully'
+    };
+  }
+
+  async setup2fa(userId: number) {
+    // 1. Lấy thông tin user, kiểm tra xem user có tồn tại hay không, và xem họ đã bật 2FA chưa
+    const user = await this.sharedUserRepository.findUnique({ id: userId });
+
+    if (!user) {
+      throw EmailNotFoundException;
+    }
+
+    if (user.totpSecret) {
+      throw TOTPAlreadyEnabledException;
+    }
+
+    // 2. Tạo 1 secret key và uri
+    const { secret, uri } = this.twoFactorService.generateTOTPSecret(user.email);
+
+    // 3. Cập nhật secret vào user trong DB
+    await this.authRepository.updateUser({ id: user.id }, { totpSecret: secret });
+
+    // 4. return secret và uri
+    return {
+      secret,
+      uri
+    };
+  }
+
+  async disable2fa(body: Disable2FABodyType, userId: number) {
+    const { code, totpCode } = body;
+
+    // 1. Lấy thông tin user, kiểm tra xem user đã bật 2fa hay chưa
+    const user = await this.sharedUserRepository.findUnique({ id: userId });
+
+    if (!user) {
+      throw EmailNotFoundException;
+    }
+
+    if (!user.totpSecret) {
+      throw TOTPNotEnabledException;
+    }
+
+    // 2. Kiểm tra mã OTP hoặc TOTP có hợp lệ không
+    if (totpCode) {
+      const validTotpCode = this.twoFactorService.verifyTOTP({
+        email: user.email,
+        secret: user.totpSecret,
+        token: totpCode
+      });
+
+      if (!validTotpCode) {
+        throw InvalidOTPException;
+      }
+    } else if (code) {
+      await this.validateVerificationCode({
+        email: user.email,
+        type: TypeOfVerificationCode.DISABLE_2FA,
+        code
+      });
+
+      await this.authRepository.deleteVerificationCode({
+        email_type: {
+          email: user.email,
+          type: TypeOfVerificationCode.DISABLE_2FA
+        }
+      });
+    }
+
+    // 3. Cập nhật secret = null
+    await this.authRepository.updateUser({ id: user.id }, { totpSecret: null });
+
+    return {
+      message: 'Tắt 2FA thành công'
     };
   }
 }

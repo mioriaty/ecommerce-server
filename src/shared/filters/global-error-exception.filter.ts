@@ -128,7 +128,7 @@ export class GlobalErrorExceptionFilter implements ExceptionFilter {
       // Case B: Các thư viện khác (hoặc code cũ) nhét mảng lỗi vào trong `res.message`
       if (Array.isArray(res.message)) {
         return {
-          message: 'Dữ liệu đầu vào không hợp lệ',
+          message: 'Error.InvalidInput',
           error: errorName,
           errors: res.message.map((issue) => this.normalizeValidationIssue(issue))
         };

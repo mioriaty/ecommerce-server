@@ -1,17 +1,20 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Query, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ZodSerializerDto } from 'nestjs-zod';
 import { GetAuthorizationUrlResDTO } from 'src/routes/auth/dto/google.dto.js';
 import { ForgotPasswordBodyDTO, LoginBodyDTO } from 'src/routes/auth/dto/login.dto.js';
 import { LogoutBodyDTO } from 'src/routes/auth/dto/logout.dto.js';
 import { RefreshTokenBodyDTO, RefreshTokenResponseDTO } from 'src/routes/auth/dto/refresh-token.dto.js';
 import { RegisterBodyDTO, RegisterResponseDTO, SendOTPBodyDTO } from 'src/routes/auth/dto/register.dto.js';
+import { Disable2FABodyDTO, Setup2FAResDTO } from 'src/routes/auth/dto/two-factor.dto.js';
 import { GoogleService } from 'src/routes/auth/google.service.js';
+import envConfig from 'src/shared/config.js';
+import { ActiveUser } from 'src/shared/decorators/active-user.decorator.js';
 import { IsPublic } from 'src/shared/decorators/auth.decorator.js';
 import { UserAgent } from 'src/shared/decorators/user-agent.decorator.js';
+import { EmptyBodyDTO } from 'src/shared/dtos/request.dto.js';
 import { MessageResDTO } from 'src/shared/dtos/response.dto.js';
 import { AuthService } from './auth.service.js';
-import { Response } from 'express';
-import envConfig from 'src/shared/config.js';
 
 @Controller('auth')
 export class AuthController {
@@ -88,5 +91,17 @@ export class AuthController {
   @ZodSerializerDto(MessageResDTO)
   async forgotPassword(@Body() dto: ForgotPasswordBodyDTO) {
     return await this.authService.forgotPassword(dto);
+  }
+
+  @Post('2fa/setup')
+  @ZodSerializerDto(Setup2FAResDTO)
+  async setup2fa(@Body() _: EmptyBodyDTO, @ActiveUser('userId') userId: number) {
+    return await this.authService.setup2fa(userId);
+  }
+
+  @Post('2fa/disable')
+  @ZodSerializerDto(MessageResDTO)
+  async disable2fa(@Body() dto: Disable2FABodyDTO, @ActiveUser('userId') userId: number) {
+    return await this.authService.disable2fa(dto, userId);
   }
 }

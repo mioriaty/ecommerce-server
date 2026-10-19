@@ -19,7 +19,7 @@ export const CustomZodValidationPipe: typeof ZodValidationPipe = createZodValida
 
     return new UnprocessableEntityException({
       statusCode: 422,
-      message: 'Dữ liệu đầu vào không hợp lệ',
+      message: 'Error.InvalidInput',
       errors: formattedErrors
     });
   }

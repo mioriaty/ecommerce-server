@@ -1,6 +1,6 @@
 import { TypeOfVerificationCode } from 'src/shared/constants/auth.constant.js';
 import { userSchema } from 'src/shared/models/shared-user.model.js';
-import z, { email } from 'zod';
+import z from 'zod';
 
 export const registerBodySchema = userSchema
   .pick({
@@ -33,7 +33,12 @@ export const verificationCodeSchema = z.object({
   id: z.number(),
   code: z.string().length(6),
   email: z.email(),
-  type: z.enum(TypeOfVerificationCode),
+  type: z.enum([
+    TypeOfVerificationCode.REGISTER,
+    TypeOfVerificationCode.DISABLE_2FA,
+    TypeOfVerificationCode.LOGIN,
+    TypeOfVerificationCode.FORGOT_PASSWORD
+  ]),
   expiresAt: z.date(),
   createdAt: z.date(),
   updatedAt: z.date()
@@ -51,7 +56,26 @@ export const loginBodySchema = userSchema
     email: true,
     password: true
   })
-  .strict();
+  .extend({
+    totpCode: z.string().length(6).optional(), // 2FA code
+    code: z.string().length(6).optional() // email otp code
+  })
+  .strict()
+  .superRefine(({ code, totpCode }, ctx) => {
+    const message = 'You should only provide a 2FA code or an OTP code';
+    if (!!code && !!totpCode) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['code'],
+        message
+      });  
+      ctx.addIssue({
+        code: 'custom',
+        path: ['totpCode'],
+        message
+      });
+    }
+  });
 
 export const loginResponseSchema = z.object({
   accessToken: z.string(),
@@ -113,6 +137,33 @@ export const forgotPasswordBodySchema = z
     }
   });
 
+export const disable2FABodySchema = z
+  .object({
+    totpCode: z.string().length(6).optional(),
+    code: z.string().length(6).optional()
+  })
+  .strict()
+  .superRefine(({ totpCode, code }, ctx) => {
+    if ((totpCode !== undefined) === (code !== undefined)) {
+      const message = 'You must provide either a totpCode or a code';
+      ctx.addIssue({
+        code: 'custom',
+        message,
+        path: ['totpCode']
+      });
+      ctx.addIssue({
+        code: 'custom',
+        message,
+        path: ['code']
+      });
+    }
+  });
+
+export const setup2FAResSchema = z.object({
+  secret: z.string(),
+  uri: z.url()
+});
+
 /**
  * Assign Types
  */
@@ -134,3 +185,7 @@ export type GoogleAuthStateType = z.infer<typeof googleAuthStateSchema>;
 export type GetAuthorizationUrlResType = z.infer<typeof getAuthorizationUrlResSchema>;
 
 export type ForgotPasswordBodyType = z.infer<typeof forgotPasswordBodySchema>;
+
+export type Disable2FABodyType = z.infer<typeof disable2FABodySchema>;
+
+export type Setup2FAResType = z.infer<typeof setup2FAResSchema>;
