@@ -13,6 +13,9 @@ import { SharedWebsocketRepository } from './repositories/shared-websocket.repos
 import { TwoFactorService } from './services/2fa.service.js';
 import { EmailService } from './services/email.service.js';
 import { S3Service } from './services/s3.service.js';
+import { AccessTokenGuard } from 'src/shared/guards/access-token.guard.js';
+import { APP_GUARD } from '@nestjs/core';
+import { AuthenticationGuard } from 'src/shared/guards/authentication.guard.js';
 
 const sharedServices = [
   PrismaService,
@@ -31,12 +34,12 @@ const sharedServices = [
 @Module({
   providers: [
     ...sharedServices,
-    // AccessTokenGuard,
-    PaymentAPIKeyGuard
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: AuthenticationGuard
-    // }
+    AccessTokenGuard,
+    PaymentAPIKeyGuard,
+    {
+      provide: APP_GUARD,
+      useClass: AuthenticationGuard
+    }
   ],
   exports: sharedServices,
   imports: [JwtModule]

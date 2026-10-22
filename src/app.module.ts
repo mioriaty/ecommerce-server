@@ -10,7 +10,19 @@ import { AuthModule } from './routes/auth/auth.module.js';
 import { LanguageModule } from './routes/language/language.module.js';
 
 @Module({
-  imports: [SharedModule, AuthModule, LanguageModule],
+  imports: [
+    // CacheModule.registerAsync({
+    //   isGlobal: true,
+    //   useFactory: () => {
+    //     return {
+    //       stores: [createKeyv(envConfig.REDIS_URL)]
+    //     };
+    //   }
+    // }),
+    SharedModule,
+    AuthModule,
+    LanguageModule
+  ],
   controllers: [AppController],
   providers: [
     AppService,
