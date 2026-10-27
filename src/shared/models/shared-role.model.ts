@@ -18,5 +18,7 @@ export const roleSchema = z.object({
 export const RolePermissionsSchema = roleSchema.extend({
   permissions: z.array(permissionSchema)
 });
+
 export type RoleType = z.infer<typeof roleSchema>;
+
 export type RolePermissionsType = z.infer<typeof RolePermissionsSchema>;
