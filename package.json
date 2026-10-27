@@ -10,7 +10,7 @@
     "build": "nest build",
     "init-seed-data": "node --loader ts-node/esm initialScript/index.ts",
     "seed-demo-data": "node --loader ts-node/esm initialScript/seed-demo-data.ts",
-    "create-permissions": "node --loader ts-node/esm initialScript/create-permissions.ts",
+    "create-permissions": "nest build && node dist/initialScript/create-permissions.js",
     "email:dev": "email dev",
     "email:build": "email build",
     "email:export": "email export",

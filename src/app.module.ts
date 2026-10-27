@@ -8,6 +8,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './routes/auth/auth.module.js';
 import { LanguageModule } from './routes/language/language.module.js';
+import { PermissionModule } from './routes/permission/permission.module.js';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { LanguageModule } from './routes/language/language.module.js';
     // }),
     SharedModule,
     AuthModule,
-    LanguageModule
+    LanguageModule,
+    PermissionModule
   ],
   controllers: [AppController],
   providers: [

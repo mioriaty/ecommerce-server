@@ -49,7 +49,7 @@ Nếu chưa có file `schema.prisma`, hãy tạo 1 file `schema.prisma` cơ bả
 sau để prisma đọc database và cập nhật file `schema.prisma`:
 
 ```bash
-prisma db pull
+  prisma db pull
 ```
 
 Nếu bạn đã có sẵn file `schema.prisma` do đang sử dụng cách `prisma db push`, thì hãy chạy lại câu lệnh `prisma db push`
@@ -60,19 +60,19 @@ Nếu bạn đã có sẵn file `schema.prisma` do đang sử dụng cách `pris
 1. Tạo thư mục `prisma/migrations/0_init`
 2. Dựa vào file `schema.prisma`, tạo file migration bằng câu lệnh sau
 
-   ```bash
-   npx prisma migrate diff \
-   --from-empty \
-   --to-schema prisma/schema.prisma \
-   --script > prisma/migrations/0_init/migration.sql
-   ```
+```bash
+npx prisma migrate diff \
+--from-empty \
+--to-schema prisma/schema.prisma \
+--script > prisma/migrations/0_init/migration.sql
+```
 
 3. Đánh dấu là file `0_init/migration.sql` đã được áp dụng. Câu lệnh dưới đây sẽ không thay đổi cấu trúc database, nó
    chỉ cập nhật dữ liệu trong table `_prisma_migrations`
 
-   ```bash
-   npx prisma migrate resolve --applied 0_init
-   ```
+```bash
+  npx prisma migrate resolve --applied 0_init
+```
 
 4. Bây giờ có thể coi là chúng ta đã chuyển từ `prisma db push` sang `prisma migrate` thành công. Commit lại file
    `schema.prisma` và thư mục `prisma/migrations` lên git.
@@ -92,11 +92,11 @@ nhưng chúng ta có thể thêm bằng cách sửa file migration.
 
 2. Paste nội dung sau vào file migration mới tạo
 
-   ```sql
-   CREATE UNIQUE INDEX permission_path_method_unique
-   ON "Permission" (path, method)
-   WHERE "deletedAt" IS NULL;
-   ```
+```sql
+  CREATE UNIQUE INDEX permission_path_method_unique
+  ON "Permission" (path, method)
+  WHERE "deletedAt" IS NULL;
+```
 
 3. Chạy migration `npx prisma migrate dev`
 
@@ -119,16 +119,22 @@ Trong trường hợp bạn không sửa hoặc sửa sai, dẫn đến migratio
 
 - Đánh dấu rollback migration
 
-  ```bash
+```bash
   npx prisma migrate resolve --rolled-back <migration-name>
-  ```
+```
 
 - Sửa file migration
 - Redeploy migration
 
-  ```bash
+```bash
   npx prisma migrate deploy
-  ```
+```
 
 > 🙏🏻Kinh nghiệm: Đừng tự ý sửa trực tiếp trên database, nếu bạn sửa trực tiếp trên database thì phải thêm câu lệnh vào
 > migration file để đồng bộ với database
+
+### Kiểm tra checksum khi lỗi "The migration was modified after it was applied"
+
+```bash
+  shasum -a 256 prisma/migrations/20220510001642_my_migration/migration.sql
+```

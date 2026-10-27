@@ -4,6 +4,6 @@
     "rootDir": ".",
     "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
   },
-  "include": ["src", "emails"],
+  "include": ["src", "emails", "initialScript"],
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
 }
