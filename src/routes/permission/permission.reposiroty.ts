@@ -6,6 +6,7 @@ import {
   UpdatePermissionBodyType
 } from 'src/routes/permission/permission.model.js';
 import { PermissionType } from 'src/shared/models/shared-permission.model.js';
+import { toPaginatedResult, toSkipTake } from 'src/shared/helpers/pagination.helper.js';
 import { PrismaService } from 'src/shared/services/prisma.service.js';
 
 @Injectable()
@@ -13,31 +14,12 @@ export class PermissionRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
   async list(pagination: GetPermissionsQueryType): Promise<GetPermissionsResponseType> {
-    const skip = (pagination.page - 1) * pagination.limit;
-    const take = pagination.limit;
-
-    const [totalItems, data] = await Promise.all([
-      this.prismaService.permission.count({
-        where: {
-          deletedAt: null
-        }
-      }),
-      this.prismaService.permission.findMany({
-        where: {
-          deletedAt: null
-        },
-        skip,
-        take
-      })
+    const [data, totalItems] = await Promise.all([
+      this.prismaService.permission.findMany({ where: { deletedAt: null }, ...toSkipTake(pagination) }),
+      this.prismaService.permission.count({ where: { deletedAt: null } })
     ]);
 
-    return {
-      data,
-      totalItems,
-      page: pagination.page,
-      limit: pagination.limit,
-      totalPages: Math.ceil(totalItems / pagination.limit)
-    };
+    return toPaginatedResult<PermissionType>({ data, totalItems, ...pagination });
   }
 
   async findById(id: number): Promise<PermissionType | null> {
